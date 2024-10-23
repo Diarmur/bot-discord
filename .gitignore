@@ -18,4 +18,4 @@ logs/
 .DS_Store
 Thumbs.db
 
-config.txt
+config.json

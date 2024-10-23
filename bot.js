@@ -1,49 +1,69 @@
-const { Client, IntentsBitField, Collection } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-const bot = new Client({ intents: [IntentsBitField.Flags.GuildVoiceStates, IntentsBitField.Flags.GuildMessages, IntentsBitField.Flags.Guilds, IntentsBitField.Flags.MessageContent] });
+const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
+const { REST } = require('@discordjs/rest');
+const { Routes } = require('discord-api-types/v9');
+const { clientId, guildId, token } = require('./config.json');
 
-bot.commands = new Collection();
+const commands = [
+  {
+    name: 'sws',
+    description: 'SWS command',
+    options: [
+      {
+        name: 'code',
+        type: 3, // Correct type for STRING
+        description: 'The SWS code',
+        required: true,
+      },
+    ],
+  },
+];
 
-// Load command files
-const commandFiles = fs.readdirSync(path.join(__dirname, 'commands')).filter(file => file.endsWith('.js'));
+const rest = new REST({ version: '9' }).setToken(token);
 
-for (const file of commandFiles) {
-  const command = require(`./commands/${file}`);
-  bot.commands.set(command.name, command);
-  console.log(`Loaded command: ${command.name}`); // Log loaded commands
-}
-
-bot.on('ready', () => {
-  console.log(`Logged in as ${bot.user.tag}!`);
-});
-
-bot.on('messageCreate', msg => {
-  console.log(`Message received: ${msg.content}`);
-  if (!msg.content.startsWith('!') || msg.author.bot) return;
-
-  const args = msg.content.slice(1).trim().split(/ +/);
-  const commandName = args.shift().toLowerCase();
-
-  console.log(`Command received: ${commandName}`); // Log received command
-
-  if (!bot.commands.has(commandName)) {
-    console.log(`Command not found: ${commandName}`); // Log if command is not found
-    return;
-  }
-
-  const command = bot.commands.get(commandName);
-
+(async () => {
   try {
-    command.execute(msg, args);
-    console.log(`Executed command: ${commandName}`); // Log successful execution
+    console.log('Started refreshing application (/) commands.');
+
+    await rest.put(
+      Routes.applicationGuildCommands(clientId, guildId),
+      { body: commands },
+    );
+
+    console.log('Successfully reloaded application (/) commands.');
   } catch (error) {
     console.error(error);
-    msg.reply('There was an error trying to execute that command!');
+  }
+})();
+
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
+
+client.once('ready', () => {
+  console.log(`Logged in as ${client.user.tag}!`);
+});
+
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isCommand()) return;
+
+  const { commandName, options } = interaction;
+
+  if (commandName === 'sws') {
+    const code = options.getString('code');
+    if (code.length !== 6 || !/^[0-9]+$/.test(code)) {
+      await interaction.reply('Veuillez indiquer un code SWS.');
+    } else {
+      const exampleEmbed = new EmbedBuilder()
+        .setColor(0x0099FF)
+        .setTitle('Code SoWeSign')
+        .setDescription('Voila le code SWS de cette periode')
+        .setThumbnail('https://pbs.twimg.com/profile_images/1216732724687527937/JCX7O4DR_400x400.jpg')
+        .addFields(
+          { name: 'SWS Code', value: code },
+        )
+        .setTimestamp();
+      
+      await interaction.reply({content:"@everyone", embeds: [exampleEmbed] });
+    }
   }
 });
 
-const config = fs.readFileSync('config.txt', 'utf8');
-const token = config.trim();
-
-bot.login(token);
+client.login(token);

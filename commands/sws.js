@@ -20,8 +20,6 @@ module.exports = {
         .setTimestamp();
       
       message.reply({embeds: [exampleEmbed] });
-      args[1] = 'le code est expiré';
-      
     }
   },
 };
